@@ -1,13 +1,15 @@
-
 class RunConfig:
-    ckey="your-ckey"
-    csecret="your-csecret"
-    atoken="your-atoken"
-    asecret="your-asecret"
+    ckey = "ZSDj9mNN79hLmiflJvz213g1K"
+    csecret = "5UHcS1S3bLdOOWRS0uNUQufiOlbrXxuan8b93iU3gJCHtFdKsE"
+    atoken = "3355371525-wJcqAJVOqbBup6Gz9nXM6Ckx69Uc1xjpUsQpix1"
+    asecret = "B1KBI9ytPN8WBCKtNb7eTO0EToXXPqM3EiRXauX36dLpP"
     dbNameInit = 'twitter.db'
     tableName = 'Tweets'
     positiveNegativeThreshold = 0.001
-    keyWords= ["Ukraine", "ukraine", "Poroshenko", "poroshenko"]
-    #keyWords= ["Trump", "usa"]
-    dbName = dbNameInit.split('.')[0]+"_".join(keyWords)+".db"
-
+    # keyWords = ["@Absher", "#أبشر",
+    #             "@moe_gov_sa", "#وزارة_التعليم",
+    #             "@SaudiMOH", "#وزارة_الصحة",
+    #             "@SaudiHousingCC", "#وزارة_الاسكان"]
+    keyWords= ["Trump", "usa"]
+    # dbName = "Absher_moegovsa_SaudiMOH_SaudiHousingCC.db"
+    dbName = "Trump.db"
