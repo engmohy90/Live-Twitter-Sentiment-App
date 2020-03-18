@@ -1,19 +1,21 @@
-# -*- coding: cp1252 -*-
+# -*- coding: utf-8 -*-
 import sqlite3
 
 import dash
+import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_table_experiments as dte
 import pandas as pd
 import plotly
 import plotly.graph_objs as go
-# from dash.dependencies import Output,Event, Input
 from dash.dependencies import Output, Input
 
 from Config import RunConfig
 from tweetsSideCounter import TweetsSideCounter
 
+gvalue = 1000
+resampleValue = "300L"
 app_colors = {
     'pageBackground': '#272B30',
     'background': '#0C0F0A',
@@ -28,17 +30,141 @@ app_colors = {
     'backgroundTableHeaders': '#001133',
     'backgroundTableRows': '#002266'
 }
-
 tweetsCounter = TweetsSideCounter()
 PositiveNegativeThreshold = RunConfig.positiveNegativeThreshold
 
-currentKeyWordsString = ",".join(RunConfig.keyWords)
-global gvalue
-gvalue = 1000
+app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+server = app.server
+app.config.suppress_callback_exceptions = True
 
-global resampleValue
-resampleValue = "300L"
-from homepage import app
+app.layout = html.Div(
+    [
+        dcc.Location(id="url"),
+        dbc.NavbarSimple(
+            children=[
+                dbc.NavLink("home", href="/", id="page-1-link"),
+                dbc.NavLink(" وزارة أبشر", href="/Absher", id="page-2-link"),
+                dbc.NavLink("وزارة الصحه", href="/SaudiMOH", id="page-3-link"),
+                dbc.NavLink("وزارة الاسكان", href="/SaudiHousingCC", id="page-4-link"),
+                dbc.NavLink("وزارة التعليم", href="/moegovsa", id="page-5-link"),
+            ],
+            brand="Live Twitter Sentiment",
+            color="primary",
+            dark=True,
+        ),
+        dbc.Container(id="page-content", className="pt-4"),
+    ]
+)
+
+
+def layout(currentKeyWordsString):
+    return html.Div(
+
+        ### Inputs initialization
+        [html.Div(className='container-fluid', children=[html.H2('Live Twitter Sentiment', style={'color': "#CECECE"}),
+                                                         html.H5('Sentiment Term:',
+                                                                 style={'color': app_colors['text'], 'margin-top': 0,
+                                                                        'margin-bottom': 0}),
+                                                         dcc.Input(id='sentiment_term', value=currentKeyWordsString,
+                                                                   type='text',
+                                                                   style={'width': 300,
+                                                                          'color': app_colors['someothercolor'],
+                                                                          'margin-top': 0, 'margin-bottom': 0}),
+                                                         html.Button('Submit', id='buttonKeyWords'),
+                                                         ],
+                  style={'width': '98%', 'margin-left': 15, 'margin-right': 15, 'max-width': 50000}
+                  ),
+
+         html.Div(className='container-fluid',
+                  children=[
+                      html.H5('Window:', style={'color': app_colors['text'], 'margin-top': 0, 'margin-bottom': 0}),
+                      html.Div(className='row', children=
+                      [dcc.Input(id='window', value=str(gvalue), type='text',
+                                 style={'width': 50, 'color': app_colors['someothercolor'], 'margin-top': 0,
+                                        'margin-bottom': 10}),
+                       html.Button('Submit', id='buttonWindow'),
+                       html.Div(id='output-container-button', children='Enter a value and press submit')
+                       ]
+                               ),
+                  ],
+                  style={'width': '98%', 'margin-left': 15, 'margin-right': 15, 'max-width': 50000}
+                  ),
+
+         ### Historical scatter plot initialization
+
+         html.Div(className='two columns', children=[html.Div(dcc.Graph(id='live-graph', figure={'layout': go.Layout(
+             xaxis={'showgrid': False},
+             yaxis={'title': 'Volume', 'side': 'right'},
+             yaxis2={'side': 'left', 'overlaying': 'y',
+                     'title': 'Sentiment', 'gridcolor': app_colors['gridcolor']},
+             font={'color': app_colors['text'], 'size': 18},
+             plot_bgcolor=app_colors['plotcolor'],
+             paper_bgcolor=app_colors['papercolor'],
+             showlegend=False,
+         )}, animate=False), style={'display': 'inline-block',
+                                    'width': '66%', 'margin-right': -15}
+                                                              ),
+                                                     html.Div(dcc.Graph(id='pie-graph', figure={'layout': go.Layout(
+                                                         xaxis={'showgrid': False},
+                                                         yaxis={'gridcolor': app_colors['gridcolor']},
+                                                         font={'color': app_colors['text'], 'size': 18},
+                                                         plot_bgcolor=app_colors['plotcolor'],
+                                                         paper_bgcolor=app_colors['papercolor'],
+                                                         showlegend=False,
+                                                     )}, animate=False),
+                                                              style={'display': 'inline-block', 'width': '34%',
+                                                                     'margin-left': -40, 'margin-right': 0}
+                                                              )
+                                                     ],
+                  style={'display': 'inline-block', 'height': 400, 'width': '100%', 'margin-left': 10,
+                         'margin-right': 10,
+                         'max-width': 50000}
+                  ),
+
+         ### Table initialization
+
+         html.Div(id="recent-tweets-table", children=[
+             html.Thead(html.Tr(children=[], style={'color': app_colors['text']})),
+             html.Tbody([html.Tr(children=[], style={'color': app_colors['text'],
+                                                     'background-color': app_colors['backgroundTableRows'],
+                                                     'border': '0.2px', 'font - size': '0.7rem'}
+                                 )])],
+                  className='col s12 m6 l6', style={'width': '98%', 'margin-top': 30, 'margin-left': 15,
+                                                    'margin-right': 15, 'max-width': 500000}),
+
+         # html.Div(className="row", children=[dte.DataTable(id="dashTable", rows=[{}],
+         #                        row_selectable=True,
+         #                        filterable=True,
+         #                        sortable=True
+         #                       )],
+         #          style={'width': '98%', 'margin-top': 50, 'margin-left': 15, 'margin-right': 15, 'max-width': 500000},
+         #          ),
+
+         ### Updates intervals
+
+         dcc.Interval(
+             id='graph-update',
+             interval=1 * 1000
+         ),
+
+         dcc.Interval(
+             id='pie-update',
+             interval=5 * 1000
+         ),
+
+         dcc.Interval(
+             id='recent-table-update',
+             interval=2 * 1000
+         ),
+
+         dcc.Interval(
+             id='dashTableUpdate',
+             interval=2 * 1000
+         ),
+
+         ], style={'backgroundColor': app_colors['pageBackground'], 'margin-top': '-20px',
+                   'margin-left': -10, 'margin-right': -10, 'height': '2000px', },
+    )
 
 
 def quick_color(s):
@@ -53,110 +179,133 @@ def quick_color(s):
     else:
         return app_colors['background']
 
-app = dash.Dash(__name__)
-app.layout = html.Div(
-    ### Inputs initialization
-    [html.Div(className='container-fluid', children=[html.H2('Live Twitter Sentiment', style={'color': "#CECECE"}),
-                                                     html.H5('Sentiment Term:',
-                                                             style={'color': app_colors['text'], 'margin-top': 0,
-                                                                    'margin-bottom': 0}),
-                                                     dcc.Input(id='sentiment_term', value=currentKeyWordsString,
-                                                               type='text',
-                                                               style={'width': 300,
-                                                                      'color': app_colors['someothercolor'],
-                                                                      'margin-top': 0, 'margin-bottom': 0}),
-                                                     # html.Button('Submit', id='buttonKeyWords'),
-                                                     ],
-              style={'width': '98%', 'margin-left': 15, 'margin-right': 15, 'max-width': 50000}
-              ),
 
-     html.Div(className='container-fluid',
-              children=[html.H5('Window:', style={'color': app_colors['text'], 'margin-top': 0, 'margin-bottom': 0}),
-                        html.Div(className='row', children=
-                        [dcc.Input(id='window', value=str(gvalue), type='text',
-                                   style={'width': 50, 'color': app_colors['someothercolor'], 'margin-top': 0,
-                                          'margin-bottom': 10}),
-                         html.Button('Submit', id='buttonWindow'),
-                         html.Div(id='output-container-button', children='Enter a value and press submit')
-                         ]
-                                 ),
-                        ],
-              style={'width': '98%', 'margin-left': 15, 'margin-right': 15, 'max-width': 50000}
-              ),
+########
 
-     ### Historical scatter plot initialization
-
-     html.Div(className='two columns', children=[html.Div(dcc.Graph(id='live-graph', figure={'layout': go.Layout(
-         xaxis={'showgrid': False},
-         yaxis={'title': 'Volume', 'side': 'right'},
-         yaxis2={'side': 'left', 'overlaying': 'y',
-                 'title': 'Sentiment', 'gridcolor': app_colors['gridcolor']},
-         font={'color': app_colors['text'], 'size': 18},
-         plot_bgcolor=app_colors['plotcolor'],
-         paper_bgcolor=app_colors['papercolor'],
-         showlegend=False,
-     )}, animate=False), style={'display': 'inline-block',
-                                'width': '66%', 'margin-right': -15}
-                                                          ),
-                                                 html.Div(dcc.Graph(id='pie-graph', figure={'layout': go.Layout(
-                                                     xaxis={'showgrid': False},
-                                                     yaxis={'gridcolor': app_colors['gridcolor']},
-                                                     font={'color': app_colors['text'], 'size': 18},
-                                                     plot_bgcolor=app_colors['plotcolor'],
-                                                     paper_bgcolor=app_colors['papercolor'],
-                                                     showlegend=False,
-                                                 )}, animate=False), style={'display': 'inline-block', 'width': '34%',
-                                                                            'margin-left': -40, 'margin-right': 0}
-                                                          )
-                                                 ],
-              style={'display': 'inline-block', 'height': 400, 'width': '100%', 'margin-left': 10, 'margin-right': 10,
-                     'max-width': 50000}
-              ),
-
-     ### Table initialization
-
-     html.Div(id="recent-tweets-table", children=[
-         html.Thead(html.Tr(children=[], style={'color': app_colors['text']})),
-         html.Tbody([html.Tr(children=[], style={'color': app_colors['text'],
-                                                 'background-color': app_colors['backgroundTableRows'],
-                                                 'border': '0.2px', 'font - size': '0.7rem'}
-                             )])],
-              className='col s12 m6 l6', style={'width': '98%', 'margin-top': 30, 'margin-left': 15,
-                                                'margin-right': 15, 'max-width': 500000}),
-
-     # html.Div(className="row", children=[dte.DataTable(id="dashTable", rows=[{}],
-     #                        row_selectable=True,
-     #                        filterable=True,
-     #                        sortable=True
-     #                       )],
-     #          style={'width': '98%', 'margin-top': 50, 'margin-left': 15, 'margin-right': 15, 'max-width': 500000},
-     #          ),
-
-     ### Updates intervals
-
-     dcc.Interval(
-         id='graph-update',
-         interval=1 * 1000
-     ),
-
-     dcc.Interval(
-         id='pie-update',
-         interval=5 * 1000
-     ),
-
-     dcc.Interval(
-         id='recent-table-update',
-         interval=2 * 1000
-     ),
-
-     dcc.Interval(
-         id='dashTableUpdate',
-         interval=2 * 1000
-     ),
-
-     ], style={'backgroundColor': app_colors['pageBackground'], 'margin-top': '-20px',
-               'margin-left': -10, 'margin-right': -10, 'height': '2000px', },
+@app.callback(
+    [Output(f"page-{i}-link", "active") for i in range(1, 4)],
+    [Input("url", "pathname")],
 )
+def toggle_active_links(pathname):
+    if pathname == "/":
+        # Treat page 1 as the homepage / index
+        return True, False, False
+    return [pathname == f"/page-{i}" for i in range(1, 4)]
+
+
+img_style = {"width": "200px",
+             "margin": "auto"}
+card_style = {"margin": "auto", "height": "200px", "width": "200px"}
+card_link = {"margin-bottom": "50px"}
+card1 = dcc.Link(
+    dbc.Card(
+        [
+            dbc.CardImg(src="https://proven-sa.com/wp-content/uploads/2016/09/Absher-logo.png", style=img_style)
+        ],
+        style=card_style,
+        id="card1-btn"
+    ), href='/Absher',
+    style=card_link,
+)
+
+card2 = dcc.Link(
+    dbc.Card(
+        [
+            dbc.CardImg(src="https://www.moh.gov.sa/_layouts/15/MOH/Internet/New/images/logo.png",
+                        top=True,style=img_style)
+        ],
+        style=card_style,
+        id="card1-btn"
+    ), href='/SaudiMOH',
+    style=card_link,
+)
+card3 = dcc.Link(
+    dbc.Card(
+        [
+            dbc.CardImg(src="https://www.housing.gov.sa/sites/all/themes/moh/images/Ministry-Logo.svg",
+                        top=True,style=img_style)
+        ],
+        style=card_style,
+        id="card1-btn"
+    ), href='/SaudiHousingCC',
+    style=card_link,
+)
+card4 = dcc.Link(
+    dbc.Card(
+        [
+            dbc.CardImg(src="https://www.moe.gov.sa/_layouts/15/MOEResp/ar-SA/Images/MOELogo.png",
+                        top=True,style=img_style)
+        ],
+        style=card_style,
+        id="card1-btn"
+    ), href='/moegovsa',
+    style=card_link,
+)
+
+# @app.callback(
+#     Output("example-output", "children"), [Input("card1-btn", "n_clicks")]
+# )
+# def on_button_click(n):
+#     if n is None:
+#         return "Not clicked."
+#     else:
+#         return f"Clicked {n} times."
+
+home = html.Div(
+    [
+        dbc.Row(
+            [
+                dbc.Col(html.Div(card1), style=card_link),
+                dbc.Col(html.Div(card2), style=card_link),
+            ],
+            align="start",
+        ),
+        dbc.Row(
+            [
+                dbc.Col(html.Div(card3), style=card_link),
+                dbc.Col(html.Div(card4), style=card_link),
+            ],
+            align="center",
+        ),
+        # dbc.Row(
+        #     [
+        #         dbc.Col(html.Div(card1)),
+        #         dbc.Col(html.Div(card1)),
+        #     ],
+        #     align="end",
+        # ),
+    ]
+)
+
+
+@app.callback(Output("page-content", "children"), [Input("url", "pathname")])
+def render_page_content(pathname):
+    if pathname in ["/"]:
+        return home
+    if pathname in ["/", "/Absher"]:
+        RunConfig.dbName = "Absher.db"
+        # RunConfig.dbName = "rump.db"
+        return layout("Absher")
+    elif pathname == "/SaudiMOH":
+        RunConfig.dbName = "SaudiMOH.db"
+        return layout("SaudiMOH")
+    elif pathname == "/SaudiHousingCC":
+        RunConfig.dbName = "SaudiHousingCC.db"
+        return layout("SaudiHousingCC")
+    elif pathname == "/moegovsa":
+        RunConfig.dbName = "moe_gov_sa.db"
+        return layout("moegovsa")
+    # If the user tries to reach a different page, return a 404 message
+    return dbc.Jumbotron(
+        [
+            html.H1("404: Not found", className="text-danger"),
+            html.Hr(),
+            html.P(f"The pathname {pathname} was not recognised..."),
+        ]
+    )
+
+
+# #########
 
 
 @app.callback(dash.dependencies.Output('output-container-button', 'children'),
@@ -295,7 +444,7 @@ def generateDashDataTable(df):
 
 @app.callback(Output('recent-tweets-table', 'children'),
               [Input(component_id='sentiment_term', component_property='value'),
-                Input("recent-table-update", "n_intervals")
+               Input("recent-table-update", "n_intervals")
                ],
               # events=[Event('recent-table-update', 'interval')]
               )
@@ -324,11 +473,11 @@ def update_recent_tweets(sentiment_term, n):
 
 @app.callback(Output('pie-graph', 'figure'),
               [Input(component_id='sentiment_term', component_property='value'),
-                Input("pie-update", "n_intervals")
+               Input("pie-update", "n_intervals")
                ],
               # events=[Event('pie-update', 'interval')],
               )
-def updatePieChart(sentiment_term,n):
+def updatePieChart(sentiment_term, n):
     df = pd.DataFrame()
     try:
         conn = sqlite3.connect(RunConfig.dbName)
@@ -369,7 +518,5 @@ def updatePieChart(sentiment_term,n):
     return df
 
 
-server = app.server
-
-if __name__ == '__main__':
-    app.run_server(debug=True)
+if __name__ == "__main__":
+    app.run_server(port=8888)

@@ -6,10 +6,12 @@ class RunConfig:
     dbNameInit = 'twitter.db'
     tableName = 'Tweets'
     positiveNegativeThreshold = 0.001
-    # keyWords = ["@Absher", "#أبشر",
-    #             "@moe_gov_sa", "#وزارة_التعليم",
-    #             "@SaudiMOH", "#وزارة_الصحة",
-    #             "@SaudiHousingCC", "#وزارة_الاسكان"]
-    keyWords= ["Trump", "usa"]
-    # dbName = "Absher_moegovsa_SaudiMOH_SaudiHousingCC.db"
-    dbName = "Trump.db"
+    keyWords = [
+        ["Trump", "usa"],
+        ["Obama"],
+        ["@Absher", "#أبشر"],
+        ["@moe_gov_sa", "#وزارة_التعليم"],
+        ["@SaudiMOH", "#وزارة_الصحة"],
+        ["@SaudiHousingCC", "#وزارة_الاسكان"]
+    ]
+    dbName = "Absher.db"
