@@ -156,22 +156,22 @@ def layout(currentKeyWordsString):
 
          dcc.Interval(
              id='graph-update',
-             interval=1 * 1000
+             interval=1 * 10000
          ),
 
          dcc.Interval(
              id='pie-update',
-             interval=5 * 1000
+             interval=5 * 10000
          ),
 
          dcc.Interval(
              id='recent-table-update',
-             interval=2 * 1000
+             interval=2 * 10000
          ),
 
          dcc.Interval(
              id='dashTableUpdate',
-             interval=2 * 1000
+             interval=2 * 10000
          ),
 
          ], style={'backgroundColor': app_colors['pageBackground'], 'margin-top': '-20px',
@@ -381,16 +381,16 @@ def update_output(n_clicks):
               # events=[Event('graph-update', 'interval')],
               )
 def update_graph_scatter(sentiment_term, window, n):
-    global gstop
-    global old_df_scatter
+    # global gstop
+    # global old_df_scatter
     try:
-        if gstop:
-            df = old_df_scatter
-        else:
+        # if gstop:
+        #     df = old_df_scatter
+        # else:
 
-            conn = sqlite3.connect(RunConfig.dbName)
-            df = pd.read_sql("SELECT * FROM %s ORDER BY UnixTime DESC LIMIT %s" % (RunConfig.tableName, gvalue), conn)
-            old_df_scatter = df
+        conn = sqlite3.connect(RunConfig.dbName)
+        df = pd.read_sql("SELECT * FROM %s ORDER BY UnixTime DESC LIMIT %s" % (RunConfig.tableName, gvalue), conn)
+        old_df_scatter = df
         if len(df) > 0:
             df.sort_values('UnixTime', inplace=True)
             df['sentiment_smoothed'] = df['Polarity'].rolling(int(len(df) / 5)).mean()
@@ -494,18 +494,18 @@ def generateDashDataTable(df):
               # events=[Event('recent-table-update', 'interval')]
               )
 def update_recent_tweets(sentiment_term, n):
-    global gstop
-    global old_df_tweets
+    # global gstop
+    # global old_df_tweets
     genTable = html.Table()
     try:
-        if gstop:
-            df = old_df_tweets
-        else:
-            conn = sqlite3.connect(RunConfig.dbName)
-            df = pd.read_sql(
-                "SELECT UnixTime, Tweet, Polarity FROM %s ORDER BY UnixTime DESC LIMIT 20" % (RunConfig.tableName),
-                conn)
-            old_df_tweets = df
+        # if gstop:
+        #     df = old_df_tweets
+        # else:
+        conn = sqlite3.connect(RunConfig.dbName)
+        df = pd.read_sql(
+            "SELECT UnixTime, Tweet, Polarity FROM %s ORDER BY UnixTime DESC LIMIT 20" % (RunConfig.tableName),
+            conn)
+        old_df_tweets = df
         if len(df) > 0:
             df['Date'] = pd.to_datetime(df['UnixTime'], unit='ms')
 
@@ -530,24 +530,24 @@ def update_recent_tweets(sentiment_term, n):
               # events=[Event('pie-update', 'interval')],
               )
 def updatePieChart(sentiment_term, n):
-    global gstop
-    global old_df_pie
+    # global gstop
+    # global old_df_pie
     df = pd.DataFrame()
     try:
-        if gstop:
-            df = old_df_pie
-        else:
-            conn = sqlite3.connect(RunConfig.dbName)
-            # df = pd.read_sql("SELECT count(case when Polarity > 0 then 1 else null end) as Positive, \
-            #        count(case when Polarity < 0 then 1 else null end) as Negative from %s"  % (RunConfig.tableName), conn)
+        # if gstop:
+        #     df = old_df_pie
+        # else:
+        conn = sqlite3.connect(RunConfig.dbName)
+        # df = pd.read_sql("SELECT count(case when Polarity > 0 then 1 else null end) as Positive, \
+        #        count(case when Polarity < 0 then 1 else null end) as Negative from %s"  % (RunConfig.tableName), conn)
 
-            df = pd.read_sql("SELECT count(case when Polarity > 0 then 1 else null end) as Positive, \
-                    count(case when Polarity < 0 then 1 else null end) as Negative from \
-                    (select Polarity from %s where abs(Polarity)>=%s \
-                     ORDER BY UnixTime DESC limit %s) as a" % (RunConfig.tableName, PositiveNegativeThreshold, gvalue),
-                             conn)
+        df = pd.read_sql("SELECT count(case when Polarity > 0 then 1 else null end) as Positive, \
+                count(case when Polarity < 0 then 1 else null end) as Negative from \
+                (select Polarity from %s where abs(Polarity)>=%s \
+                 ORDER BY UnixTime DESC limit %s) as a" % (RunConfig.tableName, PositiveNegativeThreshold, gvalue),
+                         conn)
 
-            old_df_pie = df
+        old_df_pie = df
         if len(df) > 0:
             values = [round(100 * df.Positive.iloc[0] / (df.Positive.iloc[0] + df.Negative.iloc[0]), 2),
                       round(100 * df.Negative.iloc[0] / (df.Positive.iloc[0] + df.Negative.iloc[0]), 2)]
