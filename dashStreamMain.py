@@ -15,6 +15,10 @@ from Config import RunConfig
 from tweetsSideCounter import TweetsSideCounter
 
 gvalue = 1000
+gstop = False
+old_df_pie = None
+old_df_tweets = None
+old_df_scatter = None
 resampleValue = "300L"
 app_colors = {
     'pageBackground': '#272B30',
@@ -80,14 +84,22 @@ def layout(currentKeyWordsString):
                       html.H5('Window:', style={'color': app_colors['text'], 'margin-top': 0, 'margin-bottom': 0}),
                       html.Div(className='row', children=
                       [dcc.Input(id='window', value=str(gvalue), type='text',
-                                 style={'width': 50, 'color': app_colors['someothercolor'], 'margin-top': 0,
-                                        'margin-bottom': 10}),
+                                 style={'width': 300,
+                                        'color': app_colors['someothercolor'],
+                                        'margin-top': 0, 'margin-bottom': 0}),
                        html.Button('Submit', id='buttonWindow'),
                        html.Div(id='output-container-button', children='Enter a value and press submit')
-                       ]
+                       ],
+                               ),
+                      html.Div(className='row', children=
+                      [
+                          html.Button('Toggle Live', id='buttonStop'),
+                          html.Div(id='output-container-stop-button', children='Enter a value and press submit')
+                      ],
+                               style={'margin-top': 10}
                                ),
                   ],
-                  style={'width': '98%', 'margin-left': 15, 'margin-right': 15, 'max-width': 50000}
+                  style={'width': '98%', 'margin-left': 30, 'margin-right': 30, 'max-width': 50000}
                   ),
 
          ### Historical scatter plot initialization
@@ -212,7 +224,7 @@ card2 = dcc.Link(
     dbc.Card(
         [
             dbc.CardImg(src="https://www.moh.gov.sa/_layouts/15/MOH/Internet/New/images/logo.png",
-                        top=True,style=img_style)
+                        top=True, style=img_style)
         ],
         style=card_style,
         id="card1-btn"
@@ -223,7 +235,7 @@ card3 = dcc.Link(
     dbc.Card(
         [
             dbc.CardImg(src="https://www.housing.gov.sa/sites/all/themes/moh/images/Ministry-Logo.svg",
-                        top=True,style=img_style)
+                        top=True, style=img_style)
         ],
         style=card_style,
         id="card1-btn"
@@ -234,7 +246,7 @@ card4 = dcc.Link(
     dbc.Card(
         [
             dbc.CardImg(src="https://www.moe.gov.sa/_layouts/15/MOEResp/ar-SA/Images/MOELogo.png",
-                        top=True,style=img_style)
+                        top=True, style=img_style)
         ],
         style=card_style,
         id="card1-btn"
@@ -280,19 +292,37 @@ home = html.Div(
 
 @app.callback(Output("page-content", "children"), [Input("url", "pathname")])
 def render_page_content(pathname):
+    global old_df_pie
+    global old_df_tweets
+    global old_df_scatter
     if pathname in ["/"]:
+        old_df_pie = None
+        old_df_tweets = None
+        old_df_scatter = None
         return home
     if pathname in ["/", "/Absher"]:
+        old_df_pie = None
+        old_df_tweets = None
+        old_df_scatter = None
         RunConfig.dbName = "Absher.db"
         # RunConfig.dbName = "rump.db"
         return layout("Absher")
     elif pathname == "/SaudiMOH":
+        old_df_pie = None
+        old_df_tweets = None
+        old_df_scatter = None
         RunConfig.dbName = "SaudiMOH.db"
         return layout("SaudiMOH")
     elif pathname == "/SaudiHousingCC":
+        old_df_pie = None
+        old_df_tweets = None
+        old_df_scatter = None
         RunConfig.dbName = "SaudiHousingCC.db"
         return layout("SaudiHousingCC")
     elif pathname == "/moegovsa":
+        old_df_pie = None
+        old_df_tweets = None
+        old_df_scatter = None
         RunConfig.dbName = "moe_gov_sa.db"
         return layout("moegovsa")
     # If the user tries to reach a different page, return a 404 message
@@ -335,6 +365,14 @@ def update_output(n_clicks, value):
     print("Window: " + str(gvalue) + " Resample: " + str(resampleValue))
 
 
+@app.callback(dash.dependencies.Output('output-container-stop-button', 'children'),
+              [dash.dependencies.Input('buttonStop', 'n_clicks')], )
+def update_output(n_clicks):
+    if n_clicks:
+        global gstop
+        gstop = not gstop
+
+
 @app.callback(Output('live-graph', 'figure'),
               [Input(component_id='sentiment_term', component_property='value'),
                Input(component_id='window', component_property='value'),
@@ -343,9 +381,16 @@ def update_output(n_clicks, value):
               # events=[Event('graph-update', 'interval')],
               )
 def update_graph_scatter(sentiment_term, window, n):
+    global gstop
+    global old_df_scatter
     try:
-        conn = sqlite3.connect(RunConfig.dbName)
-        df = pd.read_sql("SELECT * FROM %s ORDER BY UnixTime DESC LIMIT %s" % (RunConfig.tableName, gvalue), conn)
+        if gstop:
+            df = old_df_scatter
+        else:
+
+            conn = sqlite3.connect(RunConfig.dbName)
+            df = pd.read_sql("SELECT * FROM %s ORDER BY UnixTime DESC LIMIT %s" % (RunConfig.tableName, gvalue), conn)
+            old_df_scatter = df
         if len(df) > 0:
             df.sort_values('UnixTime', inplace=True)
             df['sentiment_smoothed'] = df['Polarity'].rolling(int(len(df) / 5)).mean()
@@ -449,11 +494,18 @@ def generateDashDataTable(df):
               # events=[Event('recent-table-update', 'interval')]
               )
 def update_recent_tweets(sentiment_term, n):
+    global gstop
+    global old_df_tweets
     genTable = html.Table()
     try:
-        conn = sqlite3.connect(RunConfig.dbName)
-        df = pd.read_sql(
-            "SELECT UnixTime, Tweet, Polarity FROM %s ORDER BY UnixTime DESC LIMIT 20" % (RunConfig.tableName), conn)
+        if gstop:
+            df = old_df_tweets
+        else:
+            conn = sqlite3.connect(RunConfig.dbName)
+            df = pd.read_sql(
+                "SELECT UnixTime, Tweet, Polarity FROM %s ORDER BY UnixTime DESC LIMIT 20" % (RunConfig.tableName),
+                conn)
+            old_df_tweets = df
         if len(df) > 0:
             df['Date'] = pd.to_datetime(df['UnixTime'], unit='ms')
 
@@ -478,17 +530,24 @@ def update_recent_tweets(sentiment_term, n):
               # events=[Event('pie-update', 'interval')],
               )
 def updatePieChart(sentiment_term, n):
+    global gstop
+    global old_df_pie
     df = pd.DataFrame()
     try:
-        conn = sqlite3.connect(RunConfig.dbName)
-        # df = pd.read_sql("SELECT count(case when Polarity > 0 then 1 else null end) as Positive, \
-        #        count(case when Polarity < 0 then 1 else null end) as Negative from %s"  % (RunConfig.tableName), conn)
+        if gstop:
+            df = old_df_pie
+        else:
+            conn = sqlite3.connect(RunConfig.dbName)
+            # df = pd.read_sql("SELECT count(case when Polarity > 0 then 1 else null end) as Positive, \
+            #        count(case when Polarity < 0 then 1 else null end) as Negative from %s"  % (RunConfig.tableName), conn)
 
-        df = pd.read_sql("SELECT count(case when Polarity > 0 then 1 else null end) as Positive, \
-                count(case when Polarity < 0 then 1 else null end) as Negative from \
-                (select Polarity from %s where abs(Polarity)>=%s \
-                 ORDER BY UnixTime DESC limit %s) as a" % (RunConfig.tableName, PositiveNegativeThreshold, gvalue),
-                         conn)
+            df = pd.read_sql("SELECT count(case when Polarity > 0 then 1 else null end) as Positive, \
+                    count(case when Polarity < 0 then 1 else null end) as Negative from \
+                    (select Polarity from %s where abs(Polarity)>=%s \
+                     ORDER BY UnixTime DESC limit %s) as a" % (RunConfig.tableName, PositiveNegativeThreshold, gvalue),
+                             conn)
+
+            old_df_pie = df
         if len(df) > 0:
             values = [round(100 * df.Positive.iloc[0] / (df.Positive.iloc[0] + df.Negative.iloc[0]), 2),
                       round(100 * df.Negative.iloc[0] / (df.Positive.iloc[0] + df.Negative.iloc[0]), 2)]
