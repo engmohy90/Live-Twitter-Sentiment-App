@@ -7,7 +7,7 @@ from tweepy.streaming import StreamListener
 import sqlite3
 import json
 from unidecode import unidecode
-from textblob_ar import TextBlob
+from textblob import TextBlob
 import re
 from threading import Thread, Lock, Event
 import time
@@ -15,7 +15,6 @@ from datetime import datetime
 from Config import RunConfig
 from tweetsSideCounter import TweetsSideCounter
 import time
-import jsonpickle
 
 
 class listener(StreamListener):
@@ -29,9 +28,7 @@ class listener(StreamListener):
     def on_data(self, data):
         tweet = ""
         try:
-            
-            #data = json.loads(data)
-            data = jsonpickle.encode(data._json, unpicklable=False).encode('utf-8') 
+            data = json.loads(data)
             tweet = unidecode(data['text'])
             tweet = tweet.replace("\'", "").replace("'", "''").replace('"', "''").replace("&", "&&").strip()
             tweet = re.sub(r'\s*https?:\/\/.*[\r\n]*', '', tweet, flags=re.MULTILINE)
@@ -113,7 +110,7 @@ class TweetsProcessing(Thread):
                  # see the name of the account print out
                  print("Authorization: " + str(api.me().name))
 
-                 twitterStream = Stream(auth, lang= 'ar', listener(self, dbName=self.dbName, tableName=self.tableName))
+                 twitterStream = Stream(auth, listener(self, dbName=self.dbName, tableName=self.tableName))
                  twitterStream.filter(track=self.keyWords, is_async =True)
 
                  #time.sleep(0.5)
